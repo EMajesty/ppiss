@@ -1,16 +1,18 @@
 [Unit]
 Description=PPISS generative telemetry display
-After=graphical.target network-online.target
-Wants=network-online.target
+After=systemd-user-sessions.service
 
 [Service]
 Type=simple
-User=pi
+User=ppiss
+Group=ppiss
+SupplementaryGroups=video render
 WorkingDirectory=/opt/ppiss
 Environment=SDL_VIDEODRIVER=kmsdrm
+Environment=SDL_AUDIODRIVER=dummy
 ExecStart=/opt/ppiss/.venv/bin/ppiss-display --fps 30
 Restart=always
 RestartSec=2
 
 [Install]
-WantedBy=graphical.target
+WantedBy=multi-user.target

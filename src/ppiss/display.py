@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import math
 import random
+import signal
 import time
 
 from .receiver import TelemetryReceiver
@@ -88,9 +89,13 @@ def main() -> None:
 
     pg.init()
     flags = 0 if args.windowed else pg.FULLSCREEN
-    screen = pg.display.set_mode(DEVELOPMENT_SIZE if args.windowed else (0, 0), flags)
+    try:
+        screen = pg.display.set_mode(DEVELOPMENT_SIZE if args.windowed else (0, 0), flags)
+    except pg.error as exc:
+        raise SystemExit(f"Could not initialize the KMS display: {exc}") from exc
     pg.display.set_caption("PPISS")
     pg.mouse.set_visible(args.windowed)
+    signal.signal(signal.SIGTERM, lambda *_: pg.event.post(pg.event.Event(pg.QUIT)))
     display_size = screen.get_size()
     canvas = pg.Surface((max(160, display_size[0] // 4), max(240, display_size[1] // 4)))
     font = pg.font.Font(None, max(36, min(72, display_size[0] // 13)))
