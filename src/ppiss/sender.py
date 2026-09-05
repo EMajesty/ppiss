@@ -1,13 +1,26 @@
 from __future__ import annotations
 
 import argparse
+import functools
 import socket
 import sys
 import time
 
 from .artwork import ArtworkServer
-from .collectors import collect_gpus, collect_now_playing
+from .collectors import collect_gpus, collect_now_playing, collect_ssds
 from .protocol import NowPlaying, Telemetry, encode
+
+
+@functools.lru_cache(maxsize=1)
+def cpu_name() -> str:
+    try:
+        with open("/proc/cpuinfo", encoding="utf-8") as cpuinfo:
+            for line in cpuinfo:
+                if line.lower().startswith("model name"):
+                    return line.split(":", 1)[1].strip()
+    except OSError:
+        pass
+    return "cpu"
 
 
 def collect(now_playing: NowPlaying | None = None) -> Telemetry:
@@ -17,17 +30,22 @@ def collect(now_playing: NowPlaying | None = None) -> Telemetry:
         raise SystemExit("Install sender dependencies: pip install 'ppiss[sender]'") from exc
 
     temperatures = psutil.sensors_temperatures() if hasattr(psutil, "sensors_temperatures") else {}
+    memory = psutil.virtual_memory()
     cpu_temp = next(
         (entry.current for group in temperatures.values() for entry in group if entry.current), None
     )
     return Telemetry(
         hostname=socket.gethostname(),
         cpu_percent=psutil.cpu_percent(interval=None),
-        memory_percent=psutil.virtual_memory().percent,
+        memory_percent=memory.percent,
+        cpu_name=cpu_name(),
+        memory_used_gb=memory.used / 1024**3,
+        memory_total_gb=memory.total / 1024**3,
         cpu_temp_c=cpu_temp,
         timestamp=time.time(),
         gpus=collect_gpus(),
         now_playing=now_playing,
+        disks=collect_ssds(psutil),
     )
 
 
@@ -46,9 +64,10 @@ def main() -> None:
 
     artwork = ArtworkServer("0.0.0.0", args.art_port)
     artwork.start()
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+        probe.connect((args.host, args.port))
+        advertised_host = probe.getsockname()[0]
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-        sock.connect((args.host, args.port))
-        advertised_host = sock.getsockname()[0]
         try:
             while True:
                 playing, source = collect_now_playing(args.mpd_host, args.mpd_port)
@@ -58,7 +77,7 @@ def main() -> None:
                         playing.player, playing.state, playing.title, playing.artist, playing.album,
                         playing.artwork_id, f"http://{advertised_host}:{args.art_port}/art/{playing.artwork_id}",
                     )
-                sock.send(encode(collect(playing)))
+                sock.sendto(encode(collect(playing)), (args.host, args.port))
                 time.sleep(max(0.1, args.interval))
         finally:
             artwork.stop()

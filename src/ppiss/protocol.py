@@ -30,10 +30,21 @@ class NowPlaying:
 
 
 @dataclass(frozen=True, slots=True)
+class Disk:
+    device: str
+    percent: float
+    used_gb: float
+    total_gb: float
+
+
+@dataclass(frozen=True, slots=True)
 class Telemetry:
     hostname: str
     cpu_percent: float
     memory_percent: float
+    cpu_name: str = "cpu"
+    memory_used_gb: float = 0.0
+    memory_total_gb: float = 0.0
     gpu_percent: float | None = None
     gpu_temp_c: float | None = None
     cpu_temp_c: float | None = None
@@ -41,15 +52,16 @@ class Telemetry:
     timestamp: float = 0.0
     gpus: tuple[GPU, ...] = ()
     now_playing: NowPlaying | None = None
+    disks: tuple[Disk, ...] = ()
 
     @classmethod
-    def from_mapping(cls, value: dict[str, Any]) -> "Telemetry":
+    def from_mapping(cls, value: dict[str, Any]) -> Telemetry:
         def number(name: str, *, optional: bool = False) -> float | None:
             raw = value.get(name)
             if raw is None and optional:
                 return None
             if isinstance(raw, bool) or not isinstance(raw, (int, float)):
-                raise ValueError(f"{name} must be a number")
+                raise TypeError(f"{name} must be a number")
             return float(raw)
 
         hostname = value.get("hostname")
@@ -73,10 +85,23 @@ class Telemetry:
                 album=str(playing.get("album", ""))[:256], artwork_id=playing.get("artwork_id"),
                 artwork_url=playing.get("artwork_url"),
             )
+        disks = tuple(
+            Disk(
+                device=str(disk.get("device", disk.get("mountpoint", "")))[:256],
+                percent=float(disk.get("percent", 0)),
+                used_gb=float(disk.get("used_gb", 0)),
+                total_gb=float(disk.get("total_gb", 0)),
+            )
+            for disk in value.get("disks", [])
+            if isinstance(disk, dict)
+        )
         return cls(
             hostname=hostname[:64],
             cpu_percent=float(number("cpu_percent")),
             memory_percent=float(number("memory_percent")),
+            cpu_name=str(value.get("cpu_name") or "cpu")[:128],
+            memory_used_gb=float(number("memory_used_gb", optional=True) or 0),
+            memory_total_gb=float(number("memory_total_gb", optional=True) or 0),
             gpu_percent=number("gpu_percent", optional=True),
             gpu_temp_c=number("gpu_temp_c", optional=True),
             cpu_temp_c=number("cpu_temp_c", optional=True),
@@ -84,6 +109,7 @@ class Telemetry:
             timestamp=float(number("timestamp")),
             gpus=gpus,
             now_playing=now_playing,
+            disks=disks,
         )
 
 
@@ -94,6 +120,9 @@ def encode(telemetry: Telemetry) -> bytes:
             "hostname": telemetry.hostname,
             "cpu_percent": telemetry.cpu_percent,
             "memory_percent": telemetry.memory_percent,
+            "cpu_name": telemetry.cpu_name,
+            "memory_used_gb": telemetry.memory_used_gb,
+            "memory_total_gb": telemetry.memory_total_gb,
             "gpu_percent": telemetry.gpu_percent,
             "gpu_temp_c": telemetry.gpu_temp_c,
             "cpu_temp_c": telemetry.cpu_temp_c,
@@ -111,6 +140,13 @@ def encode(telemetry: Telemetry) -> bytes:
                     "artwork_url": telemetry.now_playing.artwork_url,
                 } if telemetry.now_playing else None
             ),
+            "disks": [
+                {
+                    "device": disk.device, "percent": disk.percent,
+                    "used_gb": disk.used_gb, "total_gb": disk.total_gb,
+                }
+                for disk in telemetry.disks
+            ],
         },
     }
     envelope = {"payload": payload}

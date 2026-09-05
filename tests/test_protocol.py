@@ -1,7 +1,7 @@
 import json
 import unittest
 
-from ppiss.protocol import GPU, NowPlaying, Telemetry, decode, encode
+from ppiss.protocol import GPU, Disk, NowPlaying, Telemetry, decode, encode
 
 
 def sample() -> Telemetry:
@@ -12,6 +12,7 @@ def sample() -> Telemetry:
             "spotify", "playing", "Track", "Artist", "Album", "abc",
             "http://10.55.0.1:45892/art/abc",
         ),
+        disks=(Disk("/", 50, 100, 200),),
     )
 
 

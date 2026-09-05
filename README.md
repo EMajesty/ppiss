@@ -2,7 +2,12 @@
 
 ABSOLUTELY VIBECODED SLOP <3
 
+![PPISS display showing telemetry, album art, and a procedural background](assets/ppiss-screenshot.png)
+
 A generative, retro-styled PC status display for a Raspberry Pi Zero W and a portrait HDMI screen.
+Its original low-resolution patterns use layered palette cycling, scrolling, and sinusoidal scanline
+distortion inspired by techniques used in 16-bit-era battle backgrounds. It contains no game assets.
+PC statistics are drawn as a stable, monospace terminal table over the animation.
 
 ```text
 Linux PC -> UDP over USB Ethernet -> Raspberry Pi -> HDMI
@@ -52,16 +57,12 @@ This installs and starts the Linux telemetry sender as a systemd user service.
 
 ```sh
 direnv allow
-python -m ppiss.display --windowed
+./scripts/run-demo.sh
 ```
 
 Without direnv, run `nix develop` first.
-
-In another terminal:
-
-```sh
-python -m ppiss.sender --host 127.0.0.1
-```
+The script starts both the windowed display and a local telemetry sender, then stops the sender when
+the display closes. Additional arguments are passed to the display.
 
 Run tests with `python -m unittest discover -s tests`.
 

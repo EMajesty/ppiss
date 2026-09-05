@@ -19,7 +19,7 @@ if [ ! -d "$BOOT_DIR" ]; then BOOT_DIR=/boot; fi
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y --no-install-recommends git python3-pygame python3-setuptools python3-venv python3-wheel
+apt-get install -y --no-install-recommends fonts-dejavu-core git python3-pygame python3-setuptools python3-venv python3-wheel
 
 getent group render >/dev/null 2>&1 || groupadd --system render
 id ppiss >/dev/null 2>&1 || useradd --system --home-dir "$INSTALL_DIR" --shell /usr/sbin/nologin ppiss

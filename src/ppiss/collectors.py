@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import glob
 import hashlib
+import os
 import pathlib
 import subprocess
-import urllib.parse
 
-from .protocol import GPU, NowPlaying
+from .protocol import GPU, Disk, NowPlaying
 
 
 def _float(value: str) -> float | None:
@@ -62,18 +62,93 @@ def collect_gpus() -> tuple[GPU, ...]:
     return tuple(found)
 
 
+def _non_rotational_block_device(device: str) -> bool:
+    name = os.path.basename(os.path.realpath(device))
+    block = pathlib.Path("/sys/class/block") / name
+    if not block.exists():
+        return False
+    if (block / "partition").exists():
+        block = block.resolve().parent
+    rotational = block / "queue/rotational"
+    try:
+        if rotational.exists():
+            return rotational.read_text().strip() == "0"
+        slaves = list((block / "slaves").iterdir())
+        return bool(slaves) and all(_non_rotational_block_device(f"/dev/{slave.name}") for slave in slaves)
+    except OSError:
+        return False
+
+
+def _physical_block_devices(device: str) -> tuple[str, ...]:
+    name = os.path.basename(os.path.realpath(device))
+    block = pathlib.Path("/sys/class/block") / name
+    if not block.exists():
+        return ()
+    if (block / "partition").exists():
+        block = block.resolve().parent
+        name = block.name
+    try:
+        slaves = list((block / "slaves").iterdir())
+    except OSError:
+        slaves = []
+    if not slaves:
+        return (name,)
+    physical = {
+        physical_name
+        for slave in slaves
+        for physical_name in _physical_block_devices(f"/dev/{slave.name}")
+    }
+    return tuple(sorted(physical))
+
+
+def collect_ssds(psutil_module) -> tuple[Disk, ...]:
+    grouped: dict[tuple[str, ...], list[float]] = {}
+    seen_filesystems = set()
+    for partition in psutil_module.disk_partitions(all=False):
+        device = os.path.realpath(partition.device)
+        if device in seen_filesystems or not partition.device.startswith("/dev/"):
+            continue
+        if not _non_rotational_block_device(partition.device):
+            continue
+        physical = _physical_block_devices(partition.device)
+        if not physical:
+            continue
+        try:
+            usage = psutil_module.disk_usage(partition.mountpoint)
+        except OSError:
+            continue
+        seen_filesystems.add(device)
+        totals = grouped.setdefault(physical, [0.0, 0.0])
+        totals[0] += usage.used
+        totals[1] += usage.total
+    return tuple(
+        Disk(
+            "+".join(devices),
+            used / total * 100 if total else 0,
+            used / 1024**3,
+            total / 1024**3,
+        )
+        for devices, (used, total) in sorted(grouped.items())
+    )
+
+
 def _playerctl() -> tuple[NowPlaying | None, str | None]:
     try:
-        names = subprocess.run(["playerctl", "--list-all"], capture_output=True, text=True, timeout=2).stdout.splitlines()
+        names = subprocess.run(
+            ["playerctl", "--list-all"], capture_output=True, text=True, timeout=2, check=False
+        ).stdout.splitlines()
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return None, None
     candidates = []
     for name in names:
         try:
-            state = subprocess.run(["playerctl", "--player", name, "status"], capture_output=True, text=True, timeout=1).stdout.strip()
+            state = subprocess.run(
+                ["playerctl", "--player", name, "status"],
+                capture_output=True, text=True, timeout=1, check=False,
+            ).stdout.strip()
             metadata = subprocess.run(
                 ["playerctl", "--player", name, "metadata", "--format", "{{title}}\u001f{{artist}}\u001f{{album}}\u001f{{mpris:artUrl}}"],
-                capture_output=True, text=True, timeout=1,
+                capture_output=True, text=True, timeout=1, check=False,
             ).stdout.rstrip("\n").split("\x1f")
         except subprocess.TimeoutExpired:
             continue
@@ -81,7 +156,7 @@ def _playerctl() -> tuple[NowPlaying | None, str | None]:
             candidates.append((state != "Playing", name, state, (metadata + ["", "", ""])[:4]))
     if not candidates:
         return None, None
-    _, name, state, data = sorted(candidates, key=lambda item: item[0])[0]
+    _, name, state, data = min(candidates, key=lambda item: item[0])
     art_source = data[3] or None
     art_id = hashlib.sha256(art_source.encode()).hexdigest()[:20] if art_source else None
     return NowPlaying(name, state.lower(), data[0], data[1], data[2], art_id), art_source
@@ -92,7 +167,12 @@ def collect_now_playing(mpd_host: str, mpd_port: int) -> tuple[NowPlaying | None
     if playing and playing.state == "playing":
         return playing, art
     try:
-        from mpd import MPDClient
+        from mpd import CommandError, MPDClient, ProtocolError
+        from mpd import ConnectionError as MPDConnectionError
+    except ImportError:
+        return playing, art
+    mpd_errors = (CommandError, MPDConnectionError, ProtocolError, OSError, ValueError, TypeError)
+    try:
         client = MPDClient()
         client.timeout = 2
         client.connect(mpd_host, mpd_port)
@@ -103,22 +183,14 @@ def collect_now_playing(mpd_host: str, mpd_port: int) -> tuple[NowPlaying | None
         artwork = None
         for command in (client.readpicture, client.albumart):
             try:
-                chunks = bytearray()
-                while True:
-                    response = command(song.get("file", ""), len(chunks))
-                    chunk = response.get("binary", b"")
-                    if not chunk:
-                        break
-                    chunks.extend(chunk)
-                    if len(chunks) >= int(response.get("size", len(chunks))):
-                        artwork = bytes(chunks)
-                        break
+                response = command(song.get("file", ""))
+                artwork = response.get("binary") or None
                 if artwork:
                     break
-            except Exception:
-                continue
+            except mpd_errors:
+                pass
         client.close()
         art_id = hashlib.sha256(artwork).hexdigest()[:20] if artwork else None
         return NowPlaying("mpd", status.get("state", "stop"), song.get("title") or song.get("file", ""), song.get("artist", ""), song.get("album", ""), art_id), artwork
-    except Exception:
+    except mpd_errors:
         return playing, art
