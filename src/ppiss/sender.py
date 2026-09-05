@@ -31,12 +31,11 @@ def main() -> None:
     parser.add_argument("--host", default="10.55.0.2", help="Pi address")
     parser.add_argument("--port", type=int, default=45891)
     parser.add_argument("--interval", type=float, default=1.0)
-    parser.add_argument("--secret", default="", help="Shared HMAC secret")
     args = parser.parse_args()
 
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         while True:
-            sock.sendto(encode(collect(), args.secret), (args.host, args.port))
+            sock.sendto(encode(collect()), (args.host, args.port))
             time.sleep(max(0.1, args.interval))
 
 

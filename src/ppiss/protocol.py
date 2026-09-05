@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
-import hmac
 import json
 import time
 from dataclasses import dataclass
@@ -49,7 +47,7 @@ class Telemetry:
         )
 
 
-def encode(telemetry: Telemetry, secret: str = "") -> bytes:
+def encode(telemetry: Telemetry) -> bytes:
     payload = {
         "v": PROTOCOL_VERSION,
         "stats": {
@@ -63,17 +61,14 @@ def encode(telemetry: Telemetry, secret: str = "") -> bytes:
             "timestamp": telemetry.timestamp or time.time(),
         },
     }
-    canonical = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
     envelope = {"payload": payload}
-    if secret:
-        envelope["signature"] = hmac.new(secret.encode(), canonical, hashlib.sha256).hexdigest()
     result = json.dumps(envelope, separators=(",", ":")).encode()
     if len(result) > MAX_PACKET_BYTES:
         raise ValueError("telemetry packet is too large")
     return result
 
 
-def decode(packet: bytes, secret: str = "") -> Telemetry:
+def decode(packet: bytes) -> Telemetry:
     if len(packet) > MAX_PACKET_BYTES:
         raise ValueError("telemetry packet is too large")
     try:
@@ -83,9 +78,4 @@ def decode(packet: bytes, secret: str = "") -> Telemetry:
         raise ValueError("invalid telemetry packet") from exc
     if payload.get("v") != PROTOCOL_VERSION:
         raise ValueError("unsupported protocol version")
-    if secret:
-        canonical = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
-        expected = hmac.new(secret.encode(), canonical, hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(str(envelope.get("signature", "")), expected):
-            raise ValueError("invalid telemetry signature")
     return Telemetry.from_mapping(payload.get("stats", {}))

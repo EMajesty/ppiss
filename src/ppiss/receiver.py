@@ -10,8 +10,8 @@ from .protocol import MAX_PACKET_BYTES, Telemetry, decode
 class TelemetryReceiver:
     """Keep only the newest valid UDP telemetry packet."""
 
-    def __init__(self, host: str, port: int, secret: str = "") -> None:
-        self.host, self.port, self.secret = host, port, secret
+    def __init__(self, host: str, port: int) -> None:
+        self.host, self.port = host, port
         self.latest: Telemetry | None = None
         self.received_at = 0.0
         self._lock = threading.Lock()
@@ -39,9 +39,8 @@ class TelemetryReceiver:
             while not self._stop.is_set():
                 try:
                     packet, _address = sock.recvfrom(MAX_PACKET_BYTES + 1)
-                    value = decode(packet, self.secret)
+                    value = decode(packet)
                 except (TimeoutError, ValueError, OSError):
                     continue
                 with self._lock:
                     self.latest, self.received_at = value, time.monotonic()
-

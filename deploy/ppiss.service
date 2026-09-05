@@ -7,7 +7,6 @@ Wants=network-online.target
 Type=simple
 User=pi
 WorkingDirectory=/opt/ppiss
-EnvironmentFile=-/etc/ppiss.env
 Environment=SDL_VIDEODRIVER=kmsdrm
 ExecStart=/opt/ppiss/.venv/bin/ppiss-display --fps 30
 Restart=always

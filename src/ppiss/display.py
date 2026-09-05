@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import argparse
 import math
-import os
 import random
 import time
 
 from .receiver import TelemetryReceiver
 
-LOGICAL_SIZE = (200, 320)
-DISPLAY_SIZE = (800, 1280)
+DEVELOPMENT_SIZE = (800, 1280)
 
 
 def _palette(t: float) -> list[tuple[int, int, int]]:
@@ -44,20 +42,23 @@ def draw_background(pg, canvas, t: float) -> None:
 
 def draw_overlay(pg, surface, telemetry, age: float, font, small_font) -> None:
     width = surface.get_width()
-    panel = pg.Surface((width - 48, 270), pg.SRCALPHA)
+    margin = max(16, width // 32)
+    panel_height = max(210, min(300, surface.get_height() // 4))
+    panel = pg.Surface((width - margin * 2, panel_height), pg.SRCALPHA)
     panel.fill((4, 5, 12, 205))
     pg.draw.rect(panel, (236, 235, 214), panel.get_rect(), width=4, border_radius=10)
-    surface.blit(panel, (24, 28))
+    surface.blit(panel, (margin, margin))
 
     status = "LINKED" if telemetry and age < 4 else "WAITING FOR PC"
     color = (118, 255, 182) if status == "LINKED" else (255, 208, 92)
-    surface.blit(small_font.render(status, True, color), (50, 48))
+    left = margin * 2
+    surface.blit(small_font.render(status, True, color), (left, margin + 20))
     if not telemetry:
-        surface.blit(font.render("NO SIGNAL", True, (245, 245, 225)), (50, 105))
-        surface.blit(small_font.render("UDP :45891", True, (180, 185, 200)), (50, 178))
+        surface.blit(font.render("NO SIGNAL", True, (245, 245, 225)), (left, margin + 77))
+        surface.blit(small_font.render("UDP :45891", True, (180, 185, 200)), (left, margin + 150))
         return
 
-    surface.blit(font.render(telemetry.hostname.upper(), True, (245, 245, 225)), (50, 88))
+    surface.blit(font.render(telemetry.hostname.upper(), True, (245, 245, 225)), (left, margin + 60))
     fields = [
         f"CPU  {telemetry.cpu_percent:5.1f}%",
         f"RAM  {telemetry.memory_percent:5.1f}%",
@@ -67,14 +68,15 @@ def draw_overlay(pg, surface, telemetry, age: float, font, small_font) -> None:
     if telemetry.cpu_temp_c is not None:
         fields.append(f"TEMP {telemetry.cpu_temp_c:5.1f} C")
     for index, label in enumerate(fields[:3]):
-        surface.blit(small_font.render(label, True, (220, 225, 235)), (50 + (index % 2) * 340, 170 + (index // 2) * 48))
+        column_width = (width - left * 2) // 2
+        position = (left + (index % 2) * column_width, margin + 142 + (index // 2) * 48)
+        surface.blit(small_font.render(label, True, (220, 225, 235)), position)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run the PPISS Raspberry Pi generative display")
     parser.add_argument("--bind", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=45891)
-    parser.add_argument("--secret", default=os.getenv("PPISS_SECRET", ""))
     parser.add_argument("--windowed", action="store_true", help="Development window instead of fullscreen")
     parser.add_argument("--fps", type=int, default=30)
     args = parser.parse_args()
@@ -86,14 +88,15 @@ def main() -> None:
 
     pg.init()
     flags = 0 if args.windowed else pg.FULLSCREEN
-    screen = pg.display.set_mode(DISPLAY_SIZE, flags)
+    screen = pg.display.set_mode(DEVELOPMENT_SIZE if args.windowed else (0, 0), flags)
     pg.display.set_caption("PPISS")
     pg.mouse.set_visible(args.windowed)
-    canvas = pg.Surface(LOGICAL_SIZE)
-    font = pg.font.Font(None, 62)
-    small_font = pg.font.Font(None, 38)
+    display_size = screen.get_size()
+    canvas = pg.Surface((max(160, display_size[0] // 4), max(240, display_size[1] // 4)))
+    font = pg.font.Font(None, max(36, min(72, display_size[0] // 13)))
+    small_font = pg.font.Font(None, max(24, min(42, display_size[0] // 21)))
     clock = pg.time.Clock()
-    receiver = TelemetryReceiver(args.bind, args.port, args.secret)
+    receiver = TelemetryReceiver(args.bind, args.port)
     receiver.start()
     started = time.monotonic()
 
@@ -103,7 +106,7 @@ def main() -> None:
             for event in pg.event.get():
                 running = not (event.type == pg.QUIT or (event.type == pg.KEYDOWN and event.key == pg.K_ESCAPE))
             draw_background(pg, canvas, time.monotonic() - started)
-            pg.transform.scale(canvas, DISPLAY_SIZE, screen)
+            pg.transform.scale(canvas, display_size, screen)
             telemetry, age = receiver.snapshot()
             draw_overlay(pg, screen, telemetry, age, font, small_font)
             pg.display.flip()
