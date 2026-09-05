@@ -54,13 +54,28 @@ Import and configure it in Home Manager:
 
 This installs and starts the Linux telemetry sender as a systemd user service.
 
-For the ASRock B650M Pro RS WiFi, PPISS can also mirror the animation onto six 12-LED A-RGB
-fans through OpenRGB. Connect two daisy-chained fans to each 5 V addressable header (never the 12 V
-RGB header); leave fan PWM on the motherboard fan headers. Each pair mirrors one sampled region
-because the fans' A-RGB splitter is parallel. `rgb.enable` starts a localhost OpenRGB server,
-configures the three 12-LED addressable zones, and updates them at 10 Hz. On NixOS, also set
-`services.hardware.openrgb.enable = true;` in the system configuration so the user service gets HID access.
-Brightness defaults to 35% and can be changed with `services.ppiss.rgb.brightness`.
+PPISS can also mirror the animation to compatible 12-LED A-RGB fans through OpenRGB. The current
+lighting layout uses three independently controlled addressable zones, with each zone representing
+one sampled region of the display. Multiple fans connected to the same zone or parallel splitter
+will mirror that region.
+
+Connect lighting only to 5 V addressable RGB headers (never 12 V RGB headers), and keep fan PWM
+connected to suitable fan headers or a fan controller. Enable OpenRGB support and set the device
+name reported by OpenRGB:
+
+```nix
+services.ppiss.rgb = {
+  enable = true;
+  device = "Your OpenRGB device name";
+};
+```
+
+The service starts a localhost OpenRGB server, configures three 12-LED addressable zones, and
+updates them at 10 Hz. Your controller must expose the expected addressable zones in OpenRGB; zone
+names can vary between hardware and may require adapting the PPISS RGB configuration. On NixOS,
+also set `services.hardware.openrgb.enable = true;` in the system configuration so the user service
+gets hardware access. Brightness defaults to 35% and can be changed with
+`services.ppiss.rgb.brightness`.
 
 ## Development
 
