@@ -11,7 +11,7 @@ def collect() -> Telemetry:
     try:
         import psutil
     except ImportError as exc:
-        raise SystemExit("Install sender dependencies: pip install 'psi-screen[sender]'") from exc
+        raise SystemExit("Install sender dependencies: pip install 'ppiss[sender]'") from exc
 
     temperatures = psutil.sensors_temperatures() if hasattr(psutil, "sensors_temperatures") else {}
     cpu_temp = next(
@@ -27,7 +27,7 @@ def collect() -> Telemetry:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Send PC telemetry to a psi-screen display")
+    parser = argparse.ArgumentParser(description="Send PC telemetry to a PPISS display")
     parser.add_argument("--host", default="10.55.0.2", help="Pi address")
     parser.add_argument("--port", type=int, default=45891)
     parser.add_argument("--interval", type=float, default=1.0)
@@ -42,4 +42,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

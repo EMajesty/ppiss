@@ -1,7 +1,7 @@
 import json
 import unittest
 
-from psi_screen.protocol import Telemetry, decode, encode
+from ppiss.protocol import Telemetry, decode, encode
 
 
 def sample() -> Telemetry:

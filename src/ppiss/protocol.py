@@ -1,4 +1,4 @@
-"""Small, dependency-free wire protocol shared by display and sender."""
+"""Small, dependency-free PPISS wire protocol shared by display and sender."""
 
 from __future__ import annotations
 
@@ -89,4 +89,3 @@ def decode(packet: bytes, secret: str = "") -> Telemetry:
         if not hmac.compare_digest(str(envelope.get("signature", "")), expected):
             raise ValueError("invalid telemetry signature")
     return Telemetry.from_mapping(payload.get("stats", {}))
-

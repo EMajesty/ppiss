@@ -71,10 +71,10 @@ def draw_overlay(pg, surface, telemetry, age: float, font, small_font) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run the Raspberry Pi generative status display")
+    parser = argparse.ArgumentParser(description="Run the PPISS Raspberry Pi generative display")
     parser.add_argument("--bind", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=45891)
-    parser.add_argument("--secret", default=os.getenv("PSI_SECRET", ""))
+    parser.add_argument("--secret", default=os.getenv("PPISS_SECRET", ""))
     parser.add_argument("--windowed", action="store_true", help="Development window instead of fullscreen")
     parser.add_argument("--fps", type=int, default=30)
     args = parser.parse_args()
@@ -82,12 +82,12 @@ def main() -> None:
     try:
         import pygame as pg
     except ImportError as exc:
-        raise SystemExit("Install display dependencies: pip install 'psi-screen[pi]'") from exc
+        raise SystemExit("Install display dependencies: pip install 'ppiss[pi]'") from exc
 
     pg.init()
     flags = 0 if args.windowed else pg.FULLSCREEN
     screen = pg.display.set_mode(DISPLAY_SIZE, flags)
-    pg.display.set_caption("psi-screen")
+    pg.display.set_caption("PPISS")
     pg.mouse.set_visible(args.windowed)
     canvas = pg.Surface(LOGICAL_SIZE)
     font = pg.font.Font(None, 62)
@@ -115,4 +115,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

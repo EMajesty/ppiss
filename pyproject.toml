@@ -3,13 +3,13 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "psi-screen"
+name = "ppiss"
 version = "0.1.0"
 description = "A lightweight generative portrait status display for Raspberry Pi Zero W"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-authors = [{ name = "psi-screen contributors" }]
+authors = [{ name = "PPISS contributors" }]
 dependencies = []
 
 [project.optional-dependencies]
@@ -18,8 +18,8 @@ sender = ["psutil>=6,<8"]
 dev = ["pytest>=8", "ruff>=0.9"]
 
 [project.scripts]
-psi-display = "psi_screen.display:main"
-psi-send = "psi_screen.sender:main"
+ppiss-display = "ppiss.display:main"
+ppiss-send = "ppiss.sender:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -30,4 +30,3 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-
