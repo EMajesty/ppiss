@@ -1,6 +1,6 @@
 # PPISS
 
-ABSOLUTELY VIBECODED SLOP <3
+ABSOLUTELY VIBECODED <3
 
 ![PPISS display showing telemetry, album art, and a procedural background](assets/ppiss-screenshot.png)
 
