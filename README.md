@@ -51,21 +51,26 @@ This installs and starts the Linux telemetry sender as a systemd user service.
 ## Development
 
 ```sh
-nix develop
-pip install -e '.[pi,sender,dev]'
-ppiss-display --windowed
+direnv allow
+python -m ppiss.display --windowed
 ```
+
+Without direnv, run `nix develop` first.
 
 In another terminal:
 
 ```sh
-ppiss-send --host 127.0.0.1
+python -m ppiss.sender --host 127.0.0.1
 ```
 
 Run tests with `python -m unittest discover -s tests`.
 
 ## Status
 
-CPU, memory, and CPU temperature telemetry are implemented. GPU telemetry, MPD/MPRIS now-playing
-metadata, and album-art transfer are planned but not implemented. Telemetry is unauthenticated and
-intended for the dedicated USB network.
+CPU, memory, temperature, and multi-GPU telemetry are implemented. NVIDIA uses `nvidia-smi`; AMD,
+Intel, and other DRM devices use the metrics exposed by their kernel driver. Missing driver metrics
+are omitted.
+
+Spotify and other MPRIS players are detected through Playerctl, with direct MPD as a fallback.
+While music is playing, metadata and album art appear on the Pi. Artwork is cached and served by the
+PC on TCP port `45892`. Telemetry is unauthenticated and intended for the dedicated USB network.

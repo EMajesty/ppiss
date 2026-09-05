@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import argparse
+import io
 import math
 import random
 import signal
 import time
 
 from .receiver import TelemetryReceiver
+from .artwork_client import ArtworkClient
 
 DEVELOPMENT_SIZE = (800, 1280)
 
@@ -44,7 +46,9 @@ def draw_background(pg, canvas, t: float) -> None:
 def draw_overlay(pg, surface, telemetry, age: float, font, small_font) -> None:
     width = surface.get_width()
     margin = max(16, width // 32)
-    panel_height = max(210, min(300, surface.get_height() // 4))
+    gpu_count = len(telemetry.gpus) if telemetry else 0
+    rows = 1 + (2 + gpu_count + 1) // 2
+    panel_height = max(210, min(180 + rows * 48, surface.get_height() // 3))
     panel = pg.Surface((width - margin * 2, panel_height), pg.SRCALPHA)
     panel.fill((4, 5, 12, 205))
     pg.draw.rect(panel, (236, 235, 214), panel.get_rect(), width=4, border_radius=10)
@@ -64,14 +68,35 @@ def draw_overlay(pg, surface, telemetry, age: float, font, small_font) -> None:
         f"CPU  {telemetry.cpu_percent:5.1f}%",
         f"RAM  {telemetry.memory_percent:5.1f}%",
     ]
-    if telemetry.gpu_percent is not None:
+    if telemetry.gpus:
+        for index, gpu in enumerate(telemetry.gpus):
+            utilization = f"{gpu.utilization_percent:.0f}%" if gpu.utilization_percent is not None else "--%"
+            temperature = f" {gpu.temperature_c:.0f}C" if gpu.temperature_c is not None else ""
+            fields.append(f"G{index} {utilization}{temperature}")
+    elif telemetry.gpu_percent is not None:
         fields.append(f"GPU  {telemetry.gpu_percent:5.1f}%")
     if telemetry.cpu_temp_c is not None:
         fields.append(f"TEMP {telemetry.cpu_temp_c:5.1f} C")
-    for index, label in enumerate(fields[:3]):
+    max_fields = max(2, ((panel_height - 142) // 48 + 1) * 2)
+    for index, label in enumerate(fields[:max_fields]):
         column_width = (width - left * 2) // 2
         position = (left + (index % 2) * column_width, margin + 142 + (index // 2) * 48)
         surface.blit(small_font.render(label, True, (220, 225, 235)), position)
+
+
+def draw_now_playing(pg, surface, playing, artwork, font, small_font) -> None:
+    margin = max(16, surface.get_width() // 32)
+    top = max(330, surface.get_height() // 4 + margin * 2)
+    available = surface.get_height() - top - margin
+    art_size = min(surface.get_width() - margin * 2, max(0, available - 150))
+    if artwork and art_size:
+        image = pg.transform.smoothscale(artwork, (art_size, art_size))
+        surface.blit(image, ((surface.get_width() - art_size) // 2, top))
+    text_top = top + (art_size if artwork else 20) + 24
+    title = playing.title if len(playing.title) < 34 else playing.title[:31] + "..."
+    artist = playing.artist if len(playing.artist) < 48 else playing.artist[:45] + "..."
+    surface.blit(font.render(title, True, (250, 248, 230)), (margin, text_top))
+    surface.blit(small_font.render(artist, True, (210, 220, 235)), (margin, text_top + font.get_height()))
 
 
 def main() -> None:
@@ -103,6 +128,9 @@ def main() -> None:
     clock = pg.time.Clock()
     receiver = TelemetryReceiver(args.bind, args.port)
     receiver.start()
+    artwork_client = ArtworkClient()
+    artwork_id = None
+    artwork_surface = None
     started = time.monotonic()
 
     try:
@@ -114,6 +142,20 @@ def main() -> None:
             pg.transform.scale(canvas, display_size, screen)
             telemetry, age = receiver.snapshot()
             draw_overlay(pg, screen, telemetry, age, font, small_font)
+            if telemetry and telemetry.now_playing and telemetry.now_playing.state == "playing":
+                playing = telemetry.now_playing
+                artwork_client.request(playing.artwork_id, playing.artwork_url)
+                ready = artwork_client.take()
+                if ready:
+                    try:
+                        artwork_id, artwork_surface = ready[0], pg.image.load(io.BytesIO(ready[1])).convert()
+                    except pg.error:
+                        artwork_surface = None
+                draw_now_playing(
+                    pg, screen, playing,
+                    artwork_surface if artwork_id == playing.artwork_id else None,
+                    font, small_font,
+                )
             pg.display.flip()
             clock.tick(max(1, args.fps))
     finally:

@@ -12,6 +12,24 @@ MAX_PACKET_BYTES = 8192
 
 
 @dataclass(frozen=True, slots=True)
+class GPU:
+    name: str
+    utilization_percent: float | None = None
+    temperature_c: float | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class NowPlaying:
+    player: str
+    state: str
+    title: str
+    artist: str = ""
+    album: str = ""
+    artwork_id: str | None = None
+    artwork_url: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class Telemetry:
     hostname: str
     cpu_percent: float
@@ -21,6 +39,8 @@ class Telemetry:
     cpu_temp_c: float | None = None
     fps: float | None = None
     timestamp: float = 0.0
+    gpus: tuple[GPU, ...] = ()
+    now_playing: NowPlaying | None = None
 
     @classmethod
     def from_mapping(cls, value: dict[str, Any]) -> "Telemetry":
@@ -35,6 +55,24 @@ class Telemetry:
         hostname = value.get("hostname")
         if not isinstance(hostname, str) or not hostname[:64]:
             raise ValueError("hostname must be a non-empty string")
+        gpus = tuple(
+            GPU(
+                name=str(gpu.get("name", "GPU"))[:96],
+                utilization_percent=(float(gpu["utilization_percent"]) if gpu.get("utilization_percent") is not None else None),
+                temperature_c=(float(gpu["temperature_c"]) if gpu.get("temperature_c") is not None else None),
+            )
+            for gpu in value.get("gpus", [])
+            if isinstance(gpu, dict)
+        )
+        playing = value.get("now_playing")
+        now_playing = None
+        if isinstance(playing, dict) and playing.get("title"):
+            now_playing = NowPlaying(
+                player=str(playing.get("player", ""))[:64], state=str(playing.get("state", ""))[:16],
+                title=str(playing["title"])[:256], artist=str(playing.get("artist", ""))[:256],
+                album=str(playing.get("album", ""))[:256], artwork_id=playing.get("artwork_id"),
+                artwork_url=playing.get("artwork_url"),
+            )
         return cls(
             hostname=hostname[:64],
             cpu_percent=float(number("cpu_percent")),
@@ -44,6 +82,8 @@ class Telemetry:
             cpu_temp_c=number("cpu_temp_c", optional=True),
             fps=number("fps", optional=True),
             timestamp=float(number("timestamp")),
+            gpus=gpus,
+            now_playing=now_playing,
         )
 
 
@@ -59,6 +99,18 @@ def encode(telemetry: Telemetry) -> bytes:
             "cpu_temp_c": telemetry.cpu_temp_c,
             "fps": telemetry.fps,
             "timestamp": telemetry.timestamp or time.time(),
+            "gpus": [
+                {"name": gpu.name, "utilization_percent": gpu.utilization_percent, "temperature_c": gpu.temperature_c}
+                for gpu in telemetry.gpus
+            ],
+            "now_playing": (
+                {
+                    "player": telemetry.now_playing.player, "state": telemetry.now_playing.state,
+                    "title": telemetry.now_playing.title, "artist": telemetry.now_playing.artist,
+                    "album": telemetry.now_playing.album, "artwork_id": telemetry.now_playing.artwork_id,
+                    "artwork_url": telemetry.now_playing.artwork_url,
+                } if telemetry.now_playing else None
+            ),
         },
     }
     envelope = {"payload": payload}

@@ -24,9 +24,24 @@ in {
       default = 1;
       description = "Seconds between telemetry samples.";
     };
+    artworkPort = lib.mkOption {
+      type = lib.types.port;
+      default = 45892;
+      description = "TCP port used to serve album artwork to the display.";
+    };
+    mpdHost = lib.mkOption {
+      type = lib.types.str;
+      default = "127.0.0.1";
+      description = "MPD server address.";
+    };
+    mpdPort = lib.mkOption {
+      type = lib.types.port;
+      default = 6600;
+      description = "MPD server port.";
+    };
   };
   config = lib.mkIf cfg.enable {
-    home.packages = [ cfg.package ];
+    home.packages = [ cfg.package pkgs.playerctl ];
     systemd.user.services.ppiss = {
       Unit = {
         Description = "PPISS PC telemetry sender";
@@ -39,6 +54,9 @@ in {
           "--host ${lib.escapeShellArg cfg.host}"
           "--port ${toString cfg.port}"
           "--interval ${toString cfg.interval}"
+          "--art-port ${toString cfg.artworkPort}"
+          "--mpd-host ${lib.escapeShellArg cfg.mpdHost}"
+          "--mpd-port ${toString cfg.mpdPort}"
         ];
         Restart = "on-failure";
         RestartSec = 3;

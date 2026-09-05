@@ -11,7 +11,8 @@
         pyproject = true;
         src = self;
         build-system = [ pkgs.python3Packages.setuptools ];
-        dependencies = [ pkgs.python3Packages.psutil ];
+        dependencies = [ pkgs.python3Packages.psutil pkgs.python3Packages.python-mpd2 ];
+        makeWrapperArgs = [ "--prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.playerctl ]}" ];
         nativeCheckInputs = [ pkgs.python3Packages.pytestCheckHook ];
         pythonImportsCheck = [ "ppiss.protocol" "ppiss.sender" ];
       };
@@ -25,8 +26,14 @@
       homeManagerModules.default = import ./nix/home-manager-module.nix self;
       homeManagerModules.ppiss = self.homeManagerModules.default;
       devShells = forAllSystems (system: {
-        default = nixpkgs.legacyPackages.${system}.mkShell {
-          packages = with nixpkgs.legacyPackages.${system}; [ python3 python3Packages.psutil python3Packages.pytest ruff ];
+        default = let
+          pkgs = nixpkgs.legacyPackages.${system};
+          python = pkgs.python3.withPackages (ps: [ ps.psutil ps.pygame ps.pytest ps.python-mpd2 ]);
+        in pkgs.mkShell {
+          packages = [ python pkgs.playerctl pkgs.ruff ];
+          shellHook = ''
+            export PYTHONPATH="$PWD/src''${PYTHONPATH:+:$PYTHONPATH}"
+          '';
         };
       });
     };

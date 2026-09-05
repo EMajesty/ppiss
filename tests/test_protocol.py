@@ -1,11 +1,18 @@
 import json
 import unittest
 
-from ppiss.protocol import Telemetry, decode, encode
+from ppiss.protocol import GPU, NowPlaying, Telemetry, decode, encode
 
 
 def sample() -> Telemetry:
-    return Telemetry("workstation", 42.5, 61.0, gpu_percent=78, timestamp=1234)
+    return Telemetry(
+        "workstation", 42.5, 61.0, gpu_percent=78, timestamp=1234,
+        gpus=(GPU("GPU A", 72, 61), GPU("GPU B", None, 44)),
+        now_playing=NowPlaying(
+            "spotify", "playing", "Track", "Artist", "Album", "abc",
+            "http://10.55.0.1:45892/art/abc",
+        ),
+    )
 
 
 class ProtocolTests(unittest.TestCase):
