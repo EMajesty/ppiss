@@ -8,6 +8,7 @@ import time
 from .artwork_client import ArtworkClient
 from .background import BackgroundRenderer, choose_logical_size
 from .receiver import TelemetryReceiver
+from .rgb import RGB_PORT, AnimationColorSender
 
 DEVELOPMENT_SIZE = (800, 1280)
 
@@ -117,6 +118,9 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=45891)
     parser.add_argument("--windowed", action="store_true", help="Development window instead of fullscreen")
     parser.add_argument("--fps", type=int, default=30)
+    parser.add_argument("--rgb-port", type=int, default=RGB_PORT)
+    parser.add_argument("--rgb-rate", type=float, default=10.0)
+    parser.add_argument("--no-rgb", action="store_true", help="Disable animation colour streaming")
     args = parser.parse_args()
 
     try:
@@ -142,6 +146,7 @@ def main() -> None:
     clock = pg.time.Clock()
     receiver = TelemetryReceiver(args.bind, args.port)
     receiver.start()
+    rgb_sender = None if args.no_rgb else AnimationColorSender(args.rgb_port, args.rgb_rate)
     artwork_client = ArtworkClient()
     artwork_id = None
     artwork_surface = None
@@ -162,7 +167,10 @@ def main() -> None:
                         background.random_preset(elapsed)
                     elif event.key in (pg.K_p, pg.K_SPACE):
                         background.toggle_pause(elapsed)
-            pg.transform.scale(background.render(elapsed), display_size, screen)
+            background_frame = background.render(elapsed)
+            if rgb_sender:
+                rgb_sender.update(background_frame, receiver.peer_host, time.monotonic())
+            pg.transform.scale(background_frame, display_size, screen)
             telemetry, age = receiver.snapshot()
             overlay_bottom = draw_overlay(pg, screen, telemetry, age, font, small_font)
             if telemetry and telemetry.now_playing and telemetry.now_playing.state == "playing":
@@ -186,6 +194,8 @@ def main() -> None:
             pg.display.flip()
             clock.tick(max(1, args.fps))
     finally:
+        if rgb_sender:
+            rgb_sender.close()
         receiver.stop()
         pg.quit()
 

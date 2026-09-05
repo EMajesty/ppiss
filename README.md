@@ -47,11 +47,20 @@ Import and configure it in Home Manager:
   services.ppiss = {
     enable = true;
     host = "10.55.0.2";
+    rgb.enable = true;
   };
 }
 ```
 
 This installs and starts the Linux telemetry sender as a systemd user service.
+
+For the ASRock B650M Pro RS WiFi, PPISS can also mirror the animation onto six 12-LED A-RGB
+fans through OpenRGB. Connect two daisy-chained fans to each 5 V addressable header (never the 12 V
+RGB header); leave fan PWM on the motherboard fan headers. Each pair mirrors one sampled region
+because the fans' A-RGB splitter is parallel. `rgb.enable` starts a localhost OpenRGB server,
+configures the three 12-LED addressable zones, and updates them at 10 Hz. On NixOS, also set
+`services.hardware.openrgb.enable = true;` in the system configuration so the user service gets HID access.
+Brightness defaults to 35% and can be changed with `services.ppiss.rgb.brightness`.
 
 ## Development
 

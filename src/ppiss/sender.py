@@ -9,6 +9,7 @@ import time
 from .artwork import ArtworkServer
 from .collectors import collect_gpus, collect_now_playing, collect_ssds
 from .protocol import NowPlaying, Telemetry, encode
+from .rgb import RGB_PORT, ZONE_NAMES, OpenRGBOutput
 
 
 @functools.lru_cache(maxsize=1)
@@ -57,6 +58,13 @@ def main() -> None:
     parser.add_argument("--art-port", type=int, default=45892)
     parser.add_argument("--mpd-host", default="127.0.0.1")
     parser.add_argument("--mpd-port", type=int, default=6600)
+    parser.add_argument("--rgb", action="store_true", help="Drive OpenRGB zones from the display")
+    parser.add_argument("--rgb-bind", default="0.0.0.0")
+    parser.add_argument("--rgb-port", type=int, default=RGB_PORT)
+    parser.add_argument("--openrgb-host", default="127.0.0.1")
+    parser.add_argument("--openrgb-port", type=int, default=6742)
+    parser.add_argument("--openrgb-device", default="ASRock B650M Pro RS WiFi")
+    parser.add_argument("--rgb-brightness", type=float, default=0.35)
     args = parser.parse_args()
 
     if sys.platform != "linux":
@@ -64,6 +72,12 @@ def main() -> None:
 
     artwork = ArtworkServer("0.0.0.0", args.art_port)
     artwork.start()
+    rgb = OpenRGBOutput(
+        args.rgb_bind, args.rgb_port, args.openrgb_host, args.openrgb_port,
+        args.openrgb_device, ZONE_NAMES, args.rgb_brightness,
+    ) if args.rgb else None
+    if rgb:
+        rgb.start()
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
         probe.connect((args.host, args.port))
         advertised_host = probe.getsockname()[0]
@@ -80,6 +94,8 @@ def main() -> None:
                 sock.sendto(encode(collect(playing)), (args.host, args.port))
                 time.sleep(max(0.1, args.interval))
         finally:
+            if rgb:
+                rgb.stop()
             artwork.stop()
 
 

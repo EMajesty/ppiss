@@ -17,7 +17,7 @@ dependencies = []
 
 [project.optional-dependencies]
 pi = ["pygame-ce>=2.5,<3"]
-sender = ["psutil>=6,<8; sys_platform == 'linux'", "python-mpd2>=3.1,<4; sys_platform == 'linux'"]
+sender = ["psutil>=6,<8; sys_platform == 'linux'", "python-mpd2>=3.1,<4; sys_platform == 'linux'", "openrgb-python>=0.3,<1; sys_platform == 'linux'"]
 dev = ["pytest>=8", "ruff>=0.9"]
 
 [project.scripts]

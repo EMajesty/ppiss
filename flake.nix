@@ -11,7 +11,11 @@
         pyproject = true;
         src = self;
         build-system = [ pkgs.python3Packages.setuptools ];
-        dependencies = [ pkgs.python3Packages.psutil pkgs.python3Packages.python-mpd2 ];
+        dependencies = [
+          pkgs.python3Packages.psutil
+          pkgs.python3Packages.python-mpd2
+          pkgs.python3Packages.openrgb-python
+        ];
         makeWrapperArgs = [ "--prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.playerctl ]}" ];
         nativeCheckInputs = [ pkgs.python3Packages.pytestCheckHook ];
         pythonImportsCheck = [ "ppiss.protocol" "ppiss.sender" ];
@@ -28,9 +32,11 @@
       devShells = forAllSystems (system: {
         default = let
           pkgs = nixpkgs.legacyPackages.${system};
-          python = pkgs.python3.withPackages (ps: [ ps.psutil ps.pygame ps.pytest ps.python-mpd2 ]);
+          python = pkgs.python3.withPackages (ps: [
+            ps.psutil ps.pygame ps.pytest ps.python-mpd2 ps.openrgb-python
+          ]);
         in pkgs.mkShell {
-          packages = [ python pkgs.playerctl pkgs.ruff ];
+          packages = [ python pkgs.openrgb pkgs.playerctl pkgs.ruff ];
           shellHook = ''
             export PYTHONPATH="$PWD/src''${PYTHONPATH:+:$PYTHONPATH}"
           '';

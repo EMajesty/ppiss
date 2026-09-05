@@ -13,6 +13,7 @@ class TelemetryReceiver:
     def __init__(self, host: str, port: int) -> None:
         self.host, self.port = host, port
         self.latest: Telemetry | None = None
+        self.peer_host: str | None = None
         self.received_at = 0.0
         self._lock = threading.Lock()
         self._stop = threading.Event()
@@ -38,9 +39,10 @@ class TelemetryReceiver:
             sock.settimeout(0.5)
             while not self._stop.is_set():
                 try:
-                    packet, _address = sock.recvfrom(MAX_PACKET_BYTES + 1)
+                    packet, address = sock.recvfrom(MAX_PACKET_BYTES + 1)
                     value = decode(packet)
                 except (TimeoutError, ValueError, OSError):
                     continue
                 with self._lock:
                     self.latest, self.received_at = value, time.monotonic()
+                    self.peer_host = address[0]
