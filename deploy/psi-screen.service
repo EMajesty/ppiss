@@ -1,0 +1,18 @@
+[Unit]
+Description=psi-screen generative telemetry display
+After=graphical.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/opt/psi-screen
+EnvironmentFile=-/etc/psi-screen.env
+Environment=SDL_VIDEODRIVER=kmsdrm
+ExecStart=/opt/psi-screen/.venv/bin/psi-display --fps 30
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=graphical.target
+
