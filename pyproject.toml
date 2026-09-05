@@ -10,11 +10,14 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "PPISS contributors" }]
+classifiers = [
+  "Operating System :: POSIX :: Linux",
+]
 dependencies = []
 
 [project.optional-dependencies]
 pi = ["pygame-ce>=2.5,<3"]
-sender = ["psutil>=6,<8"]
+sender = ["psutil>=6,<8; sys_platform == 'linux'"]
 dev = ["pytest>=8", "ruff>=0.9"]
 
 [project.scripts]

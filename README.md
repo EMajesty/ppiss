@@ -68,19 +68,21 @@ Pi Zero W USB gadget mode uses the **USB data** port, not the power-only port. B
 
 USB gadget details vary across Pi OS images, so verify interface names with `ip link`. Regular Wi-Fi is a useful first test: pass the Pi's Wi-Fi address to `ppiss-send`.
 
-## PC sender
+## Linux PC sender
 
-Install Python 3.11+ and the sender only:
+The monitored PC must run Linux. Nix with the Home Manager module below is the primary installation
+method. For a manual development installation, use Python 3.11+:
 
 ```sh
 python -m venv .venv
-# Windows: .venv\Scripts\activate
-# Linux/macOS: . .venv/bin/activate
+. .venv/bin/activate
 pip install -e '.[sender]'
 ppiss-send --host 10.55.0.2 --interval 1
 ```
 
-CPU and memory work on Windows, Linux, and macOS through psutil. CPU temperature availability depends on the OS. GPU metrics are included in the protocol but not collected yet; they can later be populated through an NVIDIA/AMD-specific adapter without changing the Pi.
+CPU and memory are collected from Linux through psutil. CPU temperature availability depends on
+the kernel and hardware sensor drivers. GPU metrics are included in the protocol but not collected
+yet; they can later be populated through an NVIDIA/AMD-specific adapter without changing the Pi.
 
 UDP telemetry is intentionally one-way and lossy: the newest sample matters, and an old sample should never block animation. The dedicated USB network is treated as a trusted link; telemetry is not encrypted or authenticated.
 
@@ -136,7 +138,7 @@ implemented yet.
 ```text
 src/ppiss/display.py   renderer and overlay
 src/ppiss/receiver.py  non-blocking UDP receiver
-src/ppiss/sender.py    cross-platform PC collector
+src/ppiss/sender.py    Linux PC collector
 src/ppiss/protocol.py  versioned telemetry protocol
 deploy/                     systemd and USB network examples
 tests/                      protocol tests
@@ -147,4 +149,4 @@ tests/                      protocol tests
 - Add NVIDIA (`nvidia-smi`) and AMD telemetry adapters on the PC.
 - Add named visual presets and slow palette transitions.
 - Benchmark on the actual panel, then tune logical resolution and FPS.
-- Add sender auto-start (Windows Task Scheduler or a user systemd service).
+- Add more Linux telemetry sources through optional collectors.

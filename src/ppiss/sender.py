@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import socket
+import sys
 import time
 
 from .protocol import Telemetry, encode
@@ -32,6 +33,9 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=45891)
     parser.add_argument("--interval", type=float, default=1.0)
     args = parser.parse_args()
+
+    if sys.platform != "linux":
+        raise SystemExit("The PPISS telemetry sender supports Linux only")
 
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         while True:
